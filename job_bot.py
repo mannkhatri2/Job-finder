@@ -6,13 +6,14 @@ import os
 app = Flask(__name__)
 
 # =========================
-# API KEYS
+# ENVIRONMENT VARIABLES
 # =========================
 
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY")
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
 
-HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+# FAST + STABLE FREE MODEL
+HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
 
 # =========================
 # SIMPLE MEMORY
@@ -21,7 +22,7 @@ HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-I
 user_states = {}
 
 # =========================
-# HUGGING FACE AI
+# AI CAREER COACH
 # =========================
 
 def ask_free_ai(prompt):
@@ -34,35 +35,33 @@ def ask_free_ai(prompt):
     }
 
     formatted_prompt = f"""
-<s>[INST]
-You are a concise AI Career Coach on WhatsApp.
-
-Give:
-- short answers
-- actionable advice
-- friendly tone
-- bullet points
+You are an AI Career Coach.
 
 User request:
 {prompt}
-[/INST]
+
+Give:
+- short answers
+- interview tips
+- concise bullet points
+- WhatsApp-friendly formatting
 """
 
     payload = {
         "inputs": formatted_prompt,
         "parameters": {
-            "max_new_tokens": 250,
-            "temperature": 0.5,
-            "return_full_text": False
+            "max_new_tokens": 200,
+            "temperature": 0.5
         }
     }
 
     try:
+
         response = requests.post(
             HF_API_URL,
             headers=headers,
             json=payload,
-            timeout=20
+            timeout=15
         )
 
         response.raise_for_status()
@@ -75,17 +74,18 @@ User request:
         return "⚠️ AI couldn't generate a response."
 
     except requests.exceptions.Timeout:
+
         return (
-            "⚠️ AI coach is currently busy.\n\n"
+            "⚠️ AI coach is busy right now.\n\n"
             "Please try again in 20 seconds."
         )
 
     except Exception as e:
+
         print("HF ERROR:", e)
 
         return (
-            "⚠️ AI service temporarily unavailable.\n\n"
-            "Please try again shortly."
+            "⚠️ AI service temporarily unavailable."
         )
 
 # =========================
@@ -133,10 +133,18 @@ def fetch_jobs(query):
         for job in jobs[:2]:
 
             title = job.get("job_title", "Role")
-            employer = job.get("employer_name", "Company")
+
+            employer = job.get(
+                "employer_name",
+                "Company"
+            )
 
             city = job.get("job_city", "")
-            country = job.get("job_country", "")
+
+            country = job.get(
+                "job_country",
+                ""
+            )
 
             location_parts = [
                 part for part in [city, country] if part
@@ -197,7 +205,10 @@ def home():
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
 
-    incoming_msg = request.values.get("Body", "").strip()
+    incoming_msg = request.values.get(
+        "Body",
+        ""
+    ).strip()
 
     msg_lower = incoming_msg.lower()
 
@@ -209,7 +220,13 @@ def whatsapp_reply():
     # GREETING
     # =========================
 
-    if msg_lower in ["hi", "hello", "hey", "start", "help"]:
+    if msg_lower in [
+        "hi",
+        "hello",
+        "hey",
+        "start",
+        "help"
+    ]:
 
         greeting = (
             "👋 *Hi! I'm your AI Career Coach.*\n\n"
@@ -232,7 +249,11 @@ def whatsapp_reply():
     # HANDLE YES
     # =========================
 
-    if msg_lower in ["yes", "yeah", "yep"]:
+    if msg_lower in [
+        "yes",
+        "yeah",
+        "yep"
+    ]:
 
         previous_state = user_states.get(user_number)
 
@@ -243,11 +264,14 @@ def whatsapp_reply():
                 role = previous_state["query"]
 
                 interview_prompt = (
-                    f"Give top interview questions and preparation tips "
-                    f"for a {role} role."
+                    f"Give top 3 interview questions "
+                    f"and preparation tips for "
+                    f"{role}"
                 )
 
-                ai_response = ask_free_ai(interview_prompt)
+                ai_response = ask_free_ai(
+                    interview_prompt
+                )
 
                 resp.message(ai_response)
 
@@ -274,9 +298,14 @@ def whatsapp_reply():
         "advice"
     ]
 
-    if any(keyword in msg_lower for keyword in ai_keywords):
+    if any(
+        keyword in msg_lower
+        for keyword in ai_keywords
+    ):
 
-        ai_response = ask_free_ai(incoming_msg)
+        ai_response = ask_free_ai(
+            incoming_msg
+        )
 
         resp.message(ai_response)
 
@@ -291,7 +320,9 @@ def whatsapp_reply():
         "query": incoming_msg
     }
 
-    jobs_response = fetch_jobs(incoming_msg)
+    jobs_response = fetch_jobs(
+        incoming_msg
+    )
 
     resp.message(jobs_response)
 
@@ -303,7 +334,9 @@ def whatsapp_reply():
 
 if __name__ == "__main__":
 
-    port = int(os.environ.get("PORT", 10000))
+    port = int(
+        os.environ.get("PORT", 10000)
+    )
 
     app.run(
         host="0.0.0.0",
