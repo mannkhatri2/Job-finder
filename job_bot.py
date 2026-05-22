@@ -15,8 +15,8 @@ HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
 
 # MORE STABLE HF ENDPOINT
 HF_API_URL = (
-    "https://router.huggingface.co/"
-    "hf-inference/models/google/flan-t5-large"
+    "https://api-inference.huggingface.co/models/"
+    "tiiuae/falcon-7b-instruct"
 )
 
 # ==========================================
@@ -28,7 +28,6 @@ user_states = {}
 # ==========================================
 # AI CAREER COACH
 # ==========================================
-
 def ask_free_ai(prompt):
 
     if not HF_API_TOKEN:
@@ -46,97 +45,69 @@ User Request:
 {prompt}
 
 Instructions:
-- Keep answers concise
-- Use bullet points
-- Give actionable advice
-- Use WhatsApp-friendly formatting
+- concise answers
+- bullet points
+- actionable advice
+- interview focused
 """
 
     payload = {
         "inputs": formatted_prompt,
         "parameters": {
-            "max_new_tokens": 200,
-            "temperature": 0.5
+            "max_new_tokens": 150,
+            "temperature": 0.5,
+            "return_full_text": False
         }
     }
 
-    # ==========================================
-    # RETRY LOGIC
-    # ==========================================
+    try:
 
-    for attempt in range(3):
+        response = requests.post(
+            "https://api-inference.huggingface.co/models/tiiuae/falcon-7b-instruct",
+            headers=headers,
+            json=payload,
+            timeout=20
+        )
 
-        try:
+        response.raise_for_status()
 
-            response = requests.post(
-                HF_API_URL,
-                headers=headers,
-                json=payload,
-                timeout=15
-            )
+        result = response.json()
 
-            response.raise_for_status()
+        print("HF RESPONSE:", result)
 
-            result = response.json()
+        if isinstance(result, list):
 
-            print("HF RESPONSE:", result)
+            if len(result) > 0:
 
-            # ==========================================
-            # LIST RESPONSE
-            # ==========================================
+                return result[0].get(
+                    "generated_text",
+                    "⚠️ No AI response."
+                ).strip()
 
-            if isinstance(result, list):
+        if isinstance(result, dict):
 
-                if len(result) > 0:
+            if "generated_text" in result:
 
-                    return result[0].get(
-                        "generated_text",
-                        "⚠️ No AI response."
-                    ).strip()
+                return result[
+                    "generated_text"
+                ].strip()
 
-            # ==========================================
-            # DICT RESPONSE
-            # ==========================================
+            if "error" in result:
 
-            if isinstance(result, dict):
+                return (
+                    "⚠️ AI model warming up.\n\n"
+                    "Please try again in 20 seconds."
+                )
 
-                if "generated_text" in result:
+        return "⚠️ AI couldn't generate a response."
 
-                    return result[
-                        "generated_text"
-                    ].strip()
+    except Exception as e:
 
-                if "error" in result:
+        print("HF ERROR:", e)
 
-                    print("HF MODEL ERROR:", result)
-
-                    return (
-                        "⚠️ AI model warming up.\n\n"
-                        "Please try again in 20 seconds."
-                    )
-
-            return (
-                "⚠️ AI couldn't generate a response."
-            )
-
-        except requests.exceptions.Timeout:
-
-            print(
-                f"HF TIMEOUT - Attempt {attempt + 1}"
-            )
-
-            time.sleep(2)
-
-        except Exception as e:
-
-            print("HF ERROR:", e)
-
-            time.sleep(2)
-
-    return (
-        "⚠️ AI service temporarily unavailable.\n\n"
-        "Please try again shortly."
-    )
+        return (
+            "⚠️ AI service temporarily unavailable."
+        )
 
 # ==========================================
 # JOB SEARCH
