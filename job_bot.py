@@ -5,25 +5,25 @@ import os
 
 app = Flask(__name__)
 
-# =========================
+# ==========================================
 # ENVIRONMENT VARIABLES
-# =========================
+# ==========================================
 
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY")
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
 
-# FAST + STABLE FREE MODEL
+# FAST + FREE MODEL
 HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
 
-# =========================
-# SIMPLE MEMORY
-# =========================
+# ==========================================
+# SIMPLE USER MEMORY
+# ==========================================
 
 user_states = {}
 
-# =========================
+# ==========================================
 # AI CAREER COACH
-# =========================
+# ==========================================
 
 def ask_free_ai(prompt):
 
@@ -35,15 +35,15 @@ def ask_free_ai(prompt):
     }
 
     formatted_prompt = f"""
-You are an AI Career Coach.
+You are an AI Career Coach helping users on WhatsApp.
 
-User request:
+User Request:
 {prompt}
 
-Give:
-- short answers
-- interview tips
-- concise bullet points
+Instructions:
+- Keep answers concise
+- Use bullet points
+- Give actionable advice
 - WhatsApp-friendly formatting
 """
 
@@ -68,8 +68,31 @@ Give:
 
         result = response.json()
 
-        if isinstance(result, list) and len(result) > 0:
-            return result[0].get("generated_text", "").strip()
+        print("HF RESPONSE:", result)
+
+        # HF returns LIST sometimes
+        if isinstance(result, list):
+
+            if len(result) > 0:
+
+                return result[0].get(
+                    "generated_text",
+                    "⚠️ No AI response."
+                ).strip()
+
+        # HF returns DICT sometimes
+        if isinstance(result, dict):
+
+            if "generated_text" in result:
+
+                return result["generated_text"].strip()
+
+            if "error" in result:
+
+                return (
+                    "⚠️ AI model is warming up.\n\n"
+                    "Please try again in 15 seconds."
+                )
 
         return "⚠️ AI couldn't generate a response."
 
@@ -88,9 +111,9 @@ Give:
             "⚠️ AI service temporarily unavailable."
         )
 
-# =========================
+# ==========================================
 # JOB SEARCH
-# =========================
+# ==========================================
 
 def fetch_jobs(query):
 
@@ -123,6 +146,7 @@ def fetch_jobs(query):
         jobs = data.get("data", [])
 
         if not jobs:
+
             return (
                 f"❌ No active jobs found for:\n"
                 f"'{query}'"
@@ -132,14 +156,20 @@ def fetch_jobs(query):
 
         for job in jobs[:2]:
 
-            title = job.get("job_title", "Role")
+            title = job.get(
+                "job_title",
+                "Role"
+            )
 
             employer = job.get(
                 "employer_name",
                 "Company"
             )
 
-            city = job.get("job_city", "")
+            city = job.get(
+                "job_city",
+                ""
+            )
 
             country = job.get(
                 "job_country",
@@ -190,17 +220,18 @@ def fetch_jobs(query):
             "⚠️ Unable to fetch jobs right now."
         )
 
-# =========================
+# ==========================================
 # HOME ROUTE
-# =========================
+# ==========================================
 
 @app.route("/")
 def home():
+
     return "AI Career Coach is running!"
 
-# =========================
+# ==========================================
 # WHATSAPP ROUTE
-# =========================
+# ==========================================
 
 @app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
@@ -216,9 +247,9 @@ def whatsapp_reply():
 
     resp = MessagingResponse()
 
-    # =========================
+    # ==========================================
     # GREETING
-    # =========================
+    # ==========================================
 
     if msg_lower in [
         "hi",
@@ -245,9 +276,9 @@ def whatsapp_reply():
 
         return str(resp)
 
-    # =========================
+    # ==========================================
     # HANDLE YES
-    # =========================
+    # ==========================================
 
     if msg_lower in [
         "yes",
@@ -283,9 +314,9 @@ def whatsapp_reply():
 
         return str(resp)
 
-    # =========================
+    # ==========================================
     # AI ROUTING
-    # =========================
+    # ==========================================
 
     ai_keywords = [
         "interview",
@@ -311,9 +342,9 @@ def whatsapp_reply():
 
         return str(resp)
 
-    # =========================
+    # ==========================================
     # JOB SEARCH
-    # =========================
+    # ==========================================
 
     user_states[user_number] = {
         "intent": "job_search",
@@ -328,9 +359,9 @@ def whatsapp_reply():
 
     return str(resp)
 
-# =========================
+# ==========================================
 # RUN APP
-# =========================
+# ==========================================
 
 if __name__ == "__main__":
 
