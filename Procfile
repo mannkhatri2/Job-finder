@@ -1,0 +1,1 @@
+web: gunicorn whatsapp_job_bot:app
