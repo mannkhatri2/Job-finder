@@ -2,6 +2,7 @@ from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import requests
 import os
+import time
 
 app = Flask(__name__)
 
@@ -12,8 +13,11 @@ app = Flask(__name__)
 RAPIDAPI_KEY = os.environ.get("RAPIDAPI_KEY")
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
 
-# FAST + FREE MODEL
-HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-large"
+# MORE STABLE HF ENDPOINT
+HF_API_URL = (
+    "https://router.huggingface.co/"
+    "hf-inference/models/google/flan-t5-large"
+)
 
 # ==========================================
 # SIMPLE USER MEMORY
@@ -28,6 +32,7 @@ user_states = {}
 def ask_free_ai(prompt):
 
     if not HF_API_TOKEN:
+
         return "⚠️ Hugging Face token missing."
 
     headers = {
@@ -44,7 +49,7 @@ Instructions:
 - Keep answers concise
 - Use bullet points
 - Give actionable advice
-- WhatsApp-friendly formatting
+- Use WhatsApp-friendly formatting
 """
 
     payload = {
@@ -55,61 +60,83 @@ Instructions:
         }
     }
 
-    try:
+    # ==========================================
+    # RETRY LOGIC
+    # ==========================================
 
-        response = requests.post(
-            HF_API_URL,
-            headers=headers,
-            json=payload,
-            timeout=15
-        )
+    for attempt in range(3):
 
-        response.raise_for_status()
+        try:
 
-        result = response.json()
+            response = requests.post(
+                HF_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=15
+            )
 
-        print("HF RESPONSE:", result)
+            response.raise_for_status()
 
-        # HF returns LIST sometimes
-        if isinstance(result, list):
+            result = response.json()
 
-            if len(result) > 0:
+            print("HF RESPONSE:", result)
 
-                return result[0].get(
-                    "generated_text",
-                    "⚠️ No AI response."
-                ).strip()
+            # ==========================================
+            # LIST RESPONSE
+            # ==========================================
 
-        # HF returns DICT sometimes
-        if isinstance(result, dict):
+            if isinstance(result, list):
 
-            if "generated_text" in result:
+                if len(result) > 0:
 
-                return result["generated_text"].strip()
+                    return result[0].get(
+                        "generated_text",
+                        "⚠️ No AI response."
+                    ).strip()
 
-            if "error" in result:
+            # ==========================================
+            # DICT RESPONSE
+            # ==========================================
 
-                return (
-                    "⚠️ AI model is warming up.\n\n"
-                    "Please try again in 15 seconds."
-                )
+            if isinstance(result, dict):
 
-        return "⚠️ AI couldn't generate a response."
+                if "generated_text" in result:
 
-    except requests.exceptions.Timeout:
+                    return result[
+                        "generated_text"
+                    ].strip()
 
-        return (
-            "⚠️ AI coach is busy right now.\n\n"
-            "Please try again in 20 seconds."
-        )
+                if "error" in result:
 
-    except Exception as e:
+                    print("HF MODEL ERROR:", result)
 
-        print("HF ERROR:", e)
+                    return (
+                        "⚠️ AI model warming up.\n\n"
+                        "Please try again in 20 seconds."
+                    )
 
-        return (
-            "⚠️ AI service temporarily unavailable."
-        )
+            return (
+                "⚠️ AI couldn't generate a response."
+            )
+
+        except requests.exceptions.Timeout:
+
+            print(
+                f"HF TIMEOUT - Attempt {attempt + 1}"
+            )
+
+            time.sleep(2)
+
+        except Exception as e:
+
+            print("HF ERROR:", e)
+
+            time.sleep(2)
+
+    return (
+        "⚠️ AI service temporarily unavailable.\n\n"
+        "Please try again shortly."
+    )
 
 # ==========================================
 # JOB SEARCH
@@ -286,18 +313,23 @@ def whatsapp_reply():
         "yep"
     ]:
 
-        previous_state = user_states.get(user_number)
+        previous_state = user_states.get(
+            user_number
+        )
 
         if previous_state:
 
-            if previous_state["intent"] == "job_search":
+            if (
+                previous_state["intent"]
+                == "job_search"
+            ):
 
                 role = previous_state["query"]
 
                 interview_prompt = (
-                    f"Give top 3 interview questions "
-                    f"and preparation tips for "
-                    f"{role}"
+                    f"Give top 3 interview "
+                    f"questions and preparation "
+                    f"tips for {role}"
                 )
 
                 ai_response = ask_free_ai(
